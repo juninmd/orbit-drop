@@ -1,0 +1,41 @@
+import { test, expect } from "bun:test";
+import { gravityAccel, step, dist, hitsAny, reached } from "../physics.js";
+
+test("gravity pulls toward a well", () => {
+  // Well to the right of the point → positive ax, ~zero ay.
+  const { ax, ay } = gravityAccel(0, 0, [{ x: 100, y: 0, m: 1 }]);
+  expect(ax).toBeGreaterThan(0);
+  expect(Math.abs(ay)).toBeLessThan(1e-9);
+});
+
+test("symmetric wells cancel horizontally", () => {
+  const wells = [
+    { x: -100, y: 0, m: 1 },
+    { x: 100, y: 0, m: 1 },
+  ];
+  const { ax } = gravityAccel(0, 0, wells);
+  expect(Math.abs(ax)).toBeLessThan(1e-9);
+});
+
+test("step moves a resting body toward the well", () => {
+  const body = { x: 0, y: 0, vx: 0, vy: 0 };
+  const next = step(body, [{ x: 100, y: 0, m: 1 }], 0.2, 2200, 22);
+  expect(next.x).toBeGreaterThan(0); // drifted right
+  expect(next.vx).toBeGreaterThan(0);
+});
+
+test("hitsAny detects collision within radius+pad", () => {
+  const bodies = [{ x: 50, y: 50, r: 10 }];
+  expect(hitsAny(55, 50, bodies, 0)).toBe(true);
+  expect(hitsAny(70, 50, bodies, 0)).toBe(false);
+  expect(hitsAny(66, 50, bodies, 6)).toBe(true); // pad extends reach
+});
+
+test("reached checks goal tolerance", () => {
+  expect(reached(10, 10, { x: 12, y: 10 }, 5)).toBe(true);
+  expect(reached(10, 10, { x: 40, y: 10 }, 5)).toBe(false);
+});
+
+test("dist is euclidean", () => {
+  expect(dist(0, 0, 3, 4)).toBe(5);
+});
