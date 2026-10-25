@@ -1,4 +1,4 @@
-import { step, hitsAny, reached } from "./physics.js";
+import { step, hitsAny, reached, launchVelocity } from "./physics.js";
 import { levels } from "./levels.js";
 
 const W = 800;
@@ -43,6 +43,7 @@ function toLogical(e) {
 
 canvas.addEventListener("pointerdown", (e) => {
   if (state !== "aim") return;
+  canvas.setPointerCapture(e.pointerId);
   aiming = true;
   aimFrom = level().start;
   aimTo = toLogical(e);
@@ -55,17 +56,23 @@ canvas.addEventListener("pointermove", (e) => {
 });
 window.addEventListener("pointerup", () => {
   if (!aiming) return;
+  const vel = launchVelocity(aimFrom, aimTo, 160, 5.5);
   aiming = false;
-  // Launch opposite the drag (slingshot), power ∝ drag length.
-  const dx = aimFrom.x - aimTo.x;
-  const dy = aimFrom.y - aimTo.y;
-  const power = Math.min(Math.hypot(dx, dy), 160) / 160;
-  const speed = 5.5 * power;
-  const ang = Math.atan2(dy, dx);
-  ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed };
+  if (!vel) {
+    aimTo = null;
+    render();
+    return;
+  }
+  ball = { x: aimFrom.x, y: aimFrom.y, vx: vel.vx, vy: vel.vy };
   trail = [];
   attempts++;
   state = "flying";
+});
+window.addEventListener("pointercancel", () => {
+  if (!aiming) return;
+  aiming = false;
+  aimTo = null;
+  render();
 });
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
