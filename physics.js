@@ -55,6 +55,17 @@ export function launchVelocity(from, to, maxDrag = 160, maxSpeed = 5.5, minDrag 
   return { vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed };
 }
 
+/** Clamps drag vector (dx, dy) to max length while preserving direction. */
+export function clampDrag(dx, dy, max = MAX_DRAG) {
+  const drag = Math.hypot(dx, dy);
+  if (drag === 0) {
+    return { dx: 0, dy: 0, len: 0, drag: 0 };
+  }
+  const len = Math.min(drag, max);
+  const ratio = len / drag;
+  return { dx: dx * ratio, dy: dy * ratio, len, drag };
+}
+
 /** Evaluates the state of the ball against victory, collisions, out-of-bounds, or timeout. */
 export function evaluate(ball, level, config = {}) {
   const ballR = config.ballR ?? 6;
@@ -73,7 +84,7 @@ export function evaluate(ball, level, config = {}) {
   if (ball.x < minX || ball.x > maxX || ball.y < minY || ball.y > maxY) {
     return { state: "lose", loseReason: "offscreen" };
   }
-  if ((ball.steps || 0) >= maxSteps) {
+  if ((ball.steps ?? 0) >= maxSteps) {
     return { state: "lose", loseReason: "timeout" };
   }
   return { state: "flying", loseReason: null };

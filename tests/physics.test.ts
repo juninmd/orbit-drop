@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { gravityAccel, step, dist, hitsAny, reached, launchVelocity, evaluate, MAX_STEPS } from "../physics.js";
+import { gravityAccel, step, dist, hitsAny, reached, clampDrag, MAX_DRAG, launchVelocity, evaluate, MAX_STEPS } from "../physics.js";
 
 test("gravity pulls toward a well", () => {
   // Well to the right of the point → positive ax, ~zero ay.
@@ -69,6 +69,36 @@ test("launchVelocity returns correct vector opposite to drag for 100 and 500 px"
     expect(vel500.vx).toBeLessThan(0);
     expect(Math.abs(vel500.vy)).toBeLessThan(1e-9);
   }
+});
+
+test("clampDrag handles drag zero", () => {
+  const res = clampDrag(0, 0, 160);
+  expect(res).toEqual({ dx: 0, dy: 0, len: 0, drag: 0 });
+});
+
+test("clampDrag preserves vector when within max", () => {
+  const res = clampDrag(60, 80, 160); // hypot = 100
+  expect(res.drag).toBe(100);
+  expect(res.len).toBe(100);
+  expect(res.dx).toBeCloseTo(60);
+  expect(res.dy).toBeCloseTo(80);
+});
+
+test("clampDrag limits vector length to max and preserves direction", () => {
+  const res = clampDrag(180, 240, 160); // hypot = 300
+  expect(res.drag).toBe(300);
+  expect(res.len).toBe(160);
+  expect(res.dx).toBeCloseTo(96); // 180 * (160/300) = 96
+  expect(res.dy).toBeCloseTo(128); // 240 * (160/300) = 128
+  expect(Math.atan2(res.dy, res.dx)).toBeCloseTo(Math.atan2(240, 180));
+});
+
+test("clampDrag uses MAX_DRAG by default", () => {
+  expect(MAX_DRAG).toBe(160);
+  const res = clampDrag(300, 0);
+  expect(res.len).toBe(160);
+  expect(res.dx).toBeCloseTo(160);
+  expect(res.dy).toBeCloseTo(0);
 });
 
 test("orbit circular velocity evaluates to timeout after MAX_STEPS", () => {

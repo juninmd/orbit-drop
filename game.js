@@ -1,27 +1,20 @@
 import { step, evaluate } from "./physics.js";
 import { levels } from "./levels.js";
 
-const W = 800;
-const H = 520;
-const G = 2200;
-const SOFT = 22;
-const DT = 0.18;
-const BALL_R = 6;
-
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 const msg = document.getElementById("msg");
 
 let levelIdx = 0;
-let ball = null; // {x,y,vx,vy} while flying, else null
-let trail = [];
 let aiming = false;
 let aimFrom = null;
 let aimTo = null;
 let attempts = 0;
 let state = "aim"; // aim | flying | win | lose
 let loseReason = null; // well | offscreen | timeout | null
+let ball = null;
+let trail = [];
 
 function level() {
   return levels[levelIdx];
@@ -30,10 +23,10 @@ function level() {
 function reset(full) {
   ball = null;
   trail = [];
-  aiming = false;
-  aimTo = null;
   state = "aim";
   loseReason = null;
+  aiming = false;
+  aimTo = null;
   if (full) attempts = 0;
   render();
 }
@@ -51,17 +44,20 @@ canvas.addEventListener("pointerdown", (e) => {
   aimTo = toLogical(e);
   render();
 });
+
 canvas.addEventListener("pointermove", (e) => {
   if (!aiming) return;
   aimTo = toLogical(e);
   render();
 });
+
 window.addEventListener("pointerup", () => {
   if (!aiming) return;
   // Launch opposite the drag (slingshot), power ∝ drag length.
   const dx = aimFrom.x - aimTo.x;
   const dy = aimFrom.y - aimTo.y;
-  const power = Math.min(Math.hypot(dx, dy), 160) / 160;
+  const clamped = clampDrag(dx, dy, MAX_DRAG);
+  const power = clamped.len / MAX_DRAG;
   const speed = 5.5 * power;
   const ang = Math.atan2(dy, dx);
   ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, steps: 0 };
@@ -79,11 +75,11 @@ window.addEventListener("pointercancel", () => {
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
 
-function advance() {
+function nextLevel() {
   levelIdx = (levelIdx + 1) % levels.length;
   reset(true);
 }
-document.getElementById("next").addEventListener("click", advance);
+document.getElementById("next").addEventListener("click", nextLevel);
 
 function tick() {
   if (state === "flying" && ball) {
@@ -115,6 +111,7 @@ function circle(x, y, r, fill) {
 
 function render() {
   const lv = level();
+
   ctx.clearRect(0, 0, W, H);
   // starfield backdrop
   ctx.fillStyle = "#0b0f17";
@@ -149,11 +146,16 @@ function render() {
 
   // start marker + aim line
   circle(lv.start.x, lv.start.y, 5, "#e5e7eb");
+  let powerText = "";
   if (aiming && aimTo) {
+    const clamped = clampDrag(lv.start.x - aimTo.x, lv.start.y - aimTo.y, MAX_DRAG);
+    const powerPct = Math.round((clamped.len / MAX_DRAG) * 100);
+    powerText = ` · Potência: ${powerPct}%`;
+
     ctx.beginPath();
     ctx.moveTo(lv.start.x, lv.start.y);
-    ctx.lineTo(lv.start.x + (lv.start.x - aimTo.x), lv.start.y + (lv.start.y - aimTo.y));
-    ctx.strokeStyle = "#f59e0b";
+    ctx.lineTo(lv.start.x + clamped.dx, lv.start.y + clamped.dy);
+    ctx.strokeStyle = clamped.drag >= MAX_DRAG ? "#ef4444" : "#f59e0b";
     ctx.setLineDash([4, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
