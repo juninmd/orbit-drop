@@ -37,3 +37,16 @@ export function hitsAny(x, y, bodies, pad = 0) {
 export function reached(x, y, goal, tolerance) {
   return dist(x, y, goal.x, goal.y) <= tolerance;
 }
+
+export const MAX_DRAG = 160;
+
+/** Clamps drag vector (dx, dy) to max length while preserving direction. */
+export function clampDrag(dx, dy, max = MAX_DRAG) {
+  const drag = Math.hypot(dx, dy);
+  if (drag === 0) {
+    return { dx: 0, dy: 0, len: 0, drag: 0 };
+  }
+  const len = Math.min(drag, max);
+  const ratio = len / drag;
+  return { dx: dx * ratio, dy: dy * ratio, len, drag };
+}
