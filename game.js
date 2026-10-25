@@ -1,12 +1,5 @@
-import { step, hitsAny, reached } from "./physics.js";
+import { advance, W, H, BALL_R } from "./sim.js";
 import { levels } from "./levels.js";
-
-const W = 800;
-const H = 520;
-const G = 2200;
-const SOFT = 22;
-const DT = 0.18;
-const BALL_R = 6;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -14,24 +7,35 @@ const hud = document.getElementById("hud");
 const msg = document.getElementById("msg");
 
 let levelIdx = 0;
-let ball = null; // {x,y,vx,vy} while flying, else null
-let trail = [];
 let aiming = false;
 let aimFrom = null;
 let aimTo = null;
 let attempts = 0;
-let state = "aim"; // aim | flying | win | lose
+let lastTime = null;
+
+let simState = {
+  ball: null,
+  trail: [],
+  state: "aim",
+  level: levels[0],
+  accumulator: 0,
+};
 
 function level() {
   return levels[levelIdx];
 }
 
 function reset(full) {
-  ball = null;
-  trail = [];
+  simState = {
+    ball: null,
+    trail: [],
+    state: "aim",
+    level: level(),
+    accumulator: 0,
+  };
   aiming = false;
   aimTo = null;
-  state = "aim";
+  lastTime = null;
   if (full) attempts = 0;
   render();
 }
@@ -42,17 +46,19 @@ function toLogical(e) {
 }
 
 canvas.addEventListener("pointerdown", (e) => {
-  if (state !== "aim") return;
+  if (simState.state !== "aim") return;
   aiming = true;
   aimFrom = level().start;
   aimTo = toLogical(e);
   render();
 });
+
 canvas.addEventListener("pointermove", (e) => {
   if (!aiming) return;
   aimTo = toLogical(e);
   render();
 });
+
 window.addEventListener("pointerup", () => {
   if (!aiming) return;
   aiming = false;
@@ -62,37 +68,32 @@ window.addEventListener("pointerup", () => {
   const power = Math.min(Math.hypot(dx, dy), 160) / 160;
   const speed = 5.5 * power;
   const ang = Math.atan2(dy, dx);
-  ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed };
-  trail = [];
+  simState = {
+    ball: { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed },
+    trail: [],
+    state: "flying",
+    level: level(),
+    accumulator: 0,
+  };
+  lastTime = null;
   attempts++;
-  state = "flying";
 });
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
 
-function advance() {
+function nextLevel() {
   levelIdx = (levelIdx + 1) % levels.length;
   reset(true);
 }
-document.getElementById("next").addEventListener("click", advance);
+document.getElementById("next").addEventListener("click", nextLevel);
 
-function tick() {
-  if (state === "flying" && ball) {
-    for (let i = 0; i < 3; i++) {
-      ball = step(ball, level().wells, DT, G, SOFT);
-      trail.push({ x: ball.x, y: ball.y });
-      if (trail.length > 400) trail.shift();
-
-      if (reached(ball.x, ball.y, level().goal, level().goal.r)) {
-        state = "win";
-        break;
-      }
-      if (hitsAny(ball.x, ball.y, level().wells, BALL_R) || ball.x < -40 || ball.x > W + 40 || ball.y < -40 || ball.y > H + 40) {
-        state = "lose";
-        break;
-      }
-    }
+function tick(now) {
+  if (lastTime !== null) {
+    const elapsedMs = now - lastTime;
+    simState.level = level();
+    simState = advance(simState, elapsedMs);
   }
+  lastTime = now;
   render();
   requestAnimationFrame(tick);
 }
@@ -106,6 +107,8 @@ function circle(x, y, r, fill) {
 
 function render() {
   const lv = level();
+  const { ball, trail, state } = simState;
+
   ctx.clearRect(0, 0, W, H);
   // starfield backdrop
   ctx.fillStyle = "#0b0f17";
