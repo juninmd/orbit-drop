@@ -61,7 +61,8 @@ window.addEventListener("pointerup", () => {
   // Launch opposite the drag (slingshot), power ∝ drag length.
   const dx = aimFrom.x - aimTo.x;
   const dy = aimFrom.y - aimTo.y;
-  const power = Math.min(Math.hypot(dx, dy), 160) / 160;
+  const clamped = clampDrag(dx, dy, MAX_DRAG);
+  const power = clamped.len / MAX_DRAG;
   const speed = 5.5 * power;
   const ang = Math.atan2(dy, dx);
   ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, steps: 0 };
@@ -143,11 +144,16 @@ function render() {
 
   // start marker + aim line
   circle(lv.start.x, lv.start.y, 5, "#e5e7eb");
+  let powerText = "";
   if (aiming && aimTo) {
+    const clamped = clampDrag(lv.start.x - aimTo.x, lv.start.y - aimTo.y, MAX_DRAG);
+    const powerPct = Math.round((clamped.len / MAX_DRAG) * 100);
+    powerText = ` · Potência: ${powerPct}%`;
+
     ctx.beginPath();
     ctx.moveTo(lv.start.x, lv.start.y);
-    ctx.lineTo(lv.start.x + (lv.start.x - aimTo.x), lv.start.y + (lv.start.y - aimTo.y));
-    ctx.strokeStyle = "#f59e0b";
+    ctx.lineTo(lv.start.x + clamped.dx, lv.start.y + clamped.dy);
+    ctx.strokeStyle = clamped.drag >= MAX_DRAG ? "#ef4444" : "#f59e0b";
     ctx.setLineDash([4, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
