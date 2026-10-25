@@ -1,27 +1,20 @@
 import { step, evaluate } from "./physics.js";
 import { levels } from "./levels.js";
 
-const W = 800;
-const H = 520;
-const G = 2200;
-const SOFT = 22;
-const DT = 0.18;
-const BALL_R = 6;
-
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 const msg = document.getElementById("msg");
 
 let levelIdx = 0;
-let ball = null; // {x,y,vx,vy} while flying, else null
-let trail = [];
 let aiming = false;
 let aimFrom = null;
 let aimTo = null;
 let attempts = 0;
 let state = "aim"; // aim | flying | win | lose
 let loseReason = null; // well | offscreen | timeout | null
+let ball = null;
+let trail = [];
 
 function level() {
   return levels[levelIdx];
@@ -30,10 +23,10 @@ function level() {
 function reset(full) {
   ball = null;
   trail = [];
-  aiming = false;
-  aimTo = null;
   state = "aim";
   loseReason = null;
+  aiming = false;
+  aimTo = null;
   if (full) attempts = 0;
   render();
 }
@@ -50,11 +43,13 @@ canvas.addEventListener("pointerdown", (e) => {
   aimTo = toLogical(e);
   render();
 });
+
 canvas.addEventListener("pointermove", (e) => {
   if (!aiming) return;
   aimTo = toLogical(e);
   render();
 });
+
 window.addEventListener("pointerup", () => {
   if (!aiming) return;
   aiming = false;
@@ -74,11 +69,11 @@ window.addEventListener("pointerup", () => {
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
 
-function advance() {
+function nextLevel() {
   levelIdx = (levelIdx + 1) % levels.length;
   reset(true);
 }
-document.getElementById("next").addEventListener("click", advance);
+document.getElementById("next").addEventListener("click", nextLevel);
 
 function tick() {
   if (state === "flying" && ball) {
@@ -110,6 +105,7 @@ function circle(x, y, r, fill) {
 
 function render() {
   const lv = level();
+
   ctx.clearRect(0, 0, W, H);
   // starfield backdrop
   ctx.fillStyle = "#0b0f17";
