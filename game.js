@@ -1,4 +1,4 @@
-import { step, hitsAny, reached } from "./physics.js";
+import { step, evaluate } from "./physics.js";
 import { levels } from "./levels.js";
 
 const W = 800;
@@ -21,6 +21,7 @@ let aimFrom = null;
 let aimTo = null;
 let attempts = 0;
 let state = "aim"; // aim | flying | win | lose
+let loseReason = null; // well | offscreen | timeout | null
 
 function level() {
   return levels[levelIdx];
@@ -32,6 +33,7 @@ function reset(full) {
   aiming = false;
   aimTo = null;
   state = "aim";
+  loseReason = null;
   if (full) attempts = 0;
   render();
 }
@@ -62,10 +64,11 @@ window.addEventListener("pointerup", () => {
   const power = Math.min(Math.hypot(dx, dy), 160) / 160;
   const speed = 5.5 * power;
   const ang = Math.atan2(dy, dx);
-  ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed };
+  ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, steps: 0 };
   trail = [];
   attempts++;
   state = "flying";
+  loseReason = null;
 });
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
@@ -79,16 +82,16 @@ document.getElementById("next").addEventListener("click", advance);
 function tick() {
   if (state === "flying" && ball) {
     for (let i = 0; i < 3; i++) {
+      const nextSteps = (ball.steps || 0) + 1;
       ball = step(ball, level().wells, DT, G, SOFT);
+      ball.steps = nextSteps;
       trail.push({ x: ball.x, y: ball.y });
       if (trail.length > 400) trail.shift();
 
-      if (reached(ball.x, ball.y, level().goal, level().goal.r)) {
-        state = "win";
-        break;
-      }
-      if (hitsAny(ball.x, ball.y, level().wells, BALL_R) || ball.x < -40 || ball.x > W + 40 || ball.y < -40 || ball.y > H + 40) {
-        state = "lose";
+      const res = evaluate(ball, level(), { ballR: BALL_R, minX: -40, maxX: W + 40, minY: -40, maxY: H + 40 });
+      if (res.state !== "flying") {
+        state = res.state;
+        loseReason = res.loseReason;
         break;
       }
     }
@@ -154,7 +157,21 @@ function render() {
   if (ball) circle(ball.x, ball.y, BALL_R, "#fbbf24");
 
   hud.textContent = `Fase ${levelIdx + 1}/${levels.length} · ${lv.name} · tentativas: ${attempts}`;
-  msg.textContent = state === "win" ? "🎉 Chegou! Próxima fase →" : state === "lose" ? "💥 Perdeu. Tente de novo." : "Arraste a partir do ponto branco e solte (estilingue).";
+  if (state === "win") {
+    msg.textContent = "🎉 Chegou! Próxima fase →";
+  } else if (state === "lose") {
+    if (loseReason === "timeout") {
+      msg.textContent = "A bola ficou em órbita. Tente outro ângulo.";
+    } else if (loseReason === "well") {
+      msg.textContent = "💥 Colidiu com um poço. Tente de novo.";
+    } else if (loseReason === "offscreen") {
+      msg.textContent = "💥 A bola saiu da tela. Tente de novo.";
+    } else {
+      msg.textContent = "💥 Perdeu. Tente de novo.";
+    }
+  } else {
+    msg.textContent = "Arraste a partir do ponto branco e solte (estilingue).";
+  }
   msg.className = state === "win" ? "ok" : state === "lose" ? "err" : "";
 }
 

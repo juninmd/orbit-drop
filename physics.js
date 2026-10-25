@@ -1,5 +1,7 @@
 // Pure gravity physics for orbit-drop. No DOM — unit-testable in isolation.
 
+export const MAX_STEPS = 6000;
+
 /** Summed gravitational acceleration at (x,y) from all wells. Softened to avoid singularities. */
 export function gravityAccel(x, y, wells, G = 2200, soft = 22) {
   let ax = 0;
@@ -36,4 +38,28 @@ export function hitsAny(x, y, bodies, pad = 0) {
 /** True if the ball reached the goal ring center within `tolerance`. */
 export function reached(x, y, goal, tolerance) {
   return dist(x, y, goal.x, goal.y) <= tolerance;
+}
+
+/** Evaluates the state of the ball against victory, collisions, out-of-bounds, or timeout. */
+export function evaluate(ball, level, config = {}) {
+  const ballR = config.ballR ?? 6;
+  const minX = config.minX ?? -40;
+  const maxX = config.maxX ?? 840;
+  const minY = config.minY ?? -40;
+  const maxY = config.maxY ?? 560;
+  const maxSteps = config.maxSteps ?? MAX_STEPS;
+
+  if (level?.goal && reached(ball.x, ball.y, level.goal, level.goal.r)) {
+    return { state: "win", loseReason: null };
+  }
+  if (level?.wells && hitsAny(ball.x, ball.y, level.wells, ballR)) {
+    return { state: "lose", loseReason: "well" };
+  }
+  if (ball.x < minX || ball.x > maxX || ball.y < minY || ball.y > maxY) {
+    return { state: "lose", loseReason: "offscreen" };
+  }
+  if ((ball.steps || 0) >= maxSteps) {
+    return { state: "lose", loseReason: "timeout" };
+  }
+  return { state: "flying", loseReason: null };
 }
