@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { gravityAccel, step, dist, hitsAny, reached, clampDrag, MAX_DRAG } from "../physics.js";
+import { gravityAccel, step, dist, hitsAny, reached, clampDrag, MAX_DRAG, evaluate, MAX_STEPS } from "../physics.js";
 
 test("gravity pulls toward a well", () => {
   // Well to the right of the point → positive ax, ~zero ay.
@@ -68,4 +68,57 @@ test("clampDrag uses MAX_DRAG by default", () => {
   expect(res.len).toBe(160);
   expect(res.dx).toBeCloseTo(160);
   expect(res.dy).toBeCloseTo(0);
+});
+
+test("orbit circular velocity evaluates to timeout after MAX_STEPS", () => {
+  // Single well at (400, 260) with mass m = 1.0, radius 10
+  const well = { x: 400, y: 260, r: 10, m: 1.0 };
+  const wells = [well];
+  const G = 2200;
+  const SOFT = 22;
+  const DT = 0.18;
+
+  // Position ball at distance R = 200 from well along x-axis
+  const R = 200;
+  const startX = well.x - R; // 200
+  const startY = well.y;     // 260
+
+  // Calculate gravitational acceleration at start position to determine circular speed v = sqrt(a * R)
+  const { ax, ay } = gravityAccel(startX, startY, wells, G, SOFT);
+  // ax is directed towards well (positive x). magnitude is ax.
+  const aMag = Math.hypot(ax, ay);
+  const vCirc = Math.sqrt(aMag * R);
+
+  // Tangential velocity perpendicular to radius vector (pointing up, +y direction)
+  let ball = {
+    x: startX,
+    y: startY,
+    vx: 0,
+    vy: vCirc,
+    steps: 0,
+  };
+
+  const level = {
+    wells,
+    goal: { x: 9999, y: 9999, r: 10 }, // goal far away
+  };
+
+  const config = { ballR: 6, minX: -1000, maxX: 2000, minY: -1000, maxY: 2000, maxSteps: MAX_STEPS };
+
+  let result = evaluate(ball, level, config);
+  expect(result.state).toBe("flying");
+
+  // Step simulation up to MAX_STEPS
+  for (let i = 0; i < MAX_STEPS; i++) {
+    ball = step(ball, wells, DT, G, SOFT);
+    ball.steps = i + 1;
+    result = evaluate(ball, level, config);
+    if (result.state !== "flying") {
+      break;
+    }
+  }
+
+  expect(ball.steps).toBe(MAX_STEPS);
+  expect(result.state).toBe("lose");
+  expect(result.loseReason).toBe("timeout");
 });
