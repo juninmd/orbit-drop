@@ -1,5 +1,8 @@
-import { step, evaluate } from "./physics.js";
+import { step, evaluate, clampDrag, MAX_DRAG } from "./physics.js";
+import { G, SOFT, DT, BALL_R, W, H } from "./sim.js";
 import { levels } from "./levels.js";
+
+const LAUNCH_SPEED = 5.5;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -58,7 +61,7 @@ window.addEventListener("pointerup", () => {
   const dy = aimFrom.y - aimTo.y;
   const clamped = clampDrag(dx, dy, MAX_DRAG);
   const power = clamped.len / MAX_DRAG;
-  const speed = 5.5 * power;
+  const speed = LAUNCH_SPEED * power;
   const ang = Math.atan2(dy, dx);
   ball = { x: aimFrom.x, y: aimFrom.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, steps: 0 };
   trail = [];
