@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { gravityAccel, step, dist, hitsAny, reached, clampDrag, MAX_DRAG, evaluate, MAX_STEPS } from "../physics.js";
+import { gravityAccel, step, dist, hitsAny, reached, clampDrag, MAX_DRAG, launchVelocity, evaluate, MAX_STEPS } from "../physics.js";
 
 test("gravity pulls toward a well", () => {
   // Well to the right of the point → positive ax, ~zero ay.
@@ -38,6 +38,37 @@ test("reached checks goal tolerance", () => {
 
 test("dist is euclidean", () => {
   expect(dist(0, 0, 3, 4)).toBe(5);
+});
+
+test("launchVelocity returns null for drag of 0 and 11 px", () => {
+  const from = { x: 100, y: 100 };
+  expect(launchVelocity(from, { x: 100, y: 100 })).toBeNull();
+  expect(launchVelocity(from, { x: 111, y: 100 })).toBeNull();
+});
+
+test("launchVelocity returns correct vector opposite to drag for 100 and 500 px", () => {
+  const from = { x: 100, y: 100 };
+
+  // 100 px drag to the right -> launch vector to the left
+  const vel100 = launchVelocity(from, { x: 200, y: 100 });
+  expect(vel100).not.toBeNull();
+  if (vel100) {
+    const mag = Math.hypot(vel100.vx, vel100.vy);
+    expect(mag).toBeLessThanOrEqual(5.5);
+    expect(mag).toBeCloseTo(5.5 * (100 / 160), 5);
+    expect(vel100.vx).toBeLessThan(0); // opposite to drag (+100 in X)
+    expect(Math.abs(vel100.vy)).toBeLessThan(1e-9);
+  }
+
+  // 500 px drag to the right -> capped at maxSpeed = 5.5
+  const vel500 = launchVelocity(from, { x: 600, y: 100 });
+  expect(vel500).not.toBeNull();
+  if (vel500) {
+    const mag = Math.hypot(vel500.vx, vel500.vy);
+    expect(mag).toBeCloseTo(5.5, 5);
+    expect(vel500.vx).toBeLessThan(0);
+    expect(Math.abs(vel500.vy)).toBeLessThan(1e-9);
+  }
 });
 
 test("clampDrag handles drag zero", () => {
@@ -85,7 +116,6 @@ test("orbit circular velocity evaluates to timeout after MAX_STEPS", () => {
 
   // Calculate gravitational acceleration at start position to determine circular speed v = sqrt(a * R)
   const { ax, ay } = gravityAccel(startX, startY, wells, G, SOFT);
-  // ax is directed towards well (positive x). magnitude is ax.
   const aMag = Math.hypot(ax, ay);
   const vCirc = Math.sqrt(aMag * R);
 

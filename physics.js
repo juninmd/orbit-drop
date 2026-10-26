@@ -38,7 +38,22 @@ export function reached(x, y, goal, tolerance) {
   return dist(x, y, goal.x, goal.y) <= tolerance;
 }
 
-export const MAX_DRAG = 160;
+export const MIN_DRAG = 12;
+
+/**
+ * Calculates launch velocity vector based on drag vector from start position to input pointer position.
+ * Returns null if drag length < minDrag.
+ */
+export function launchVelocity(from, to, maxDrag = 160, maxSpeed = 5.5, minDrag = MIN_DRAG) {
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  const drag = Math.hypot(dx, dy);
+  if (drag < minDrag) return null;
+  const power = Math.min(drag, maxDrag) / maxDrag;
+  const speed = maxSpeed * power;
+  const ang = Math.atan2(dy, dx);
+  return { vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed };
+}
 
 /** Clamps drag vector (dx, dy) to max length while preserving direction. */
 export function clampDrag(dx, dy, max = MAX_DRAG) {

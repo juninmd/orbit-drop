@@ -41,6 +41,7 @@ function toLogical(e) {
 
 canvas.addEventListener("pointerdown", (e) => {
   if (state !== "aim") return;
+  canvas.setPointerCapture(e.pointerId);
   aiming = true;
   aimFrom = level().start;
   aimTo = toLogical(e);
@@ -55,7 +56,6 @@ canvas.addEventListener("pointermove", (e) => {
 
 window.addEventListener("pointerup", () => {
   if (!aiming) return;
-  aiming = false;
   // Launch opposite the drag (slingshot), power ∝ drag length.
   const dx = aimFrom.x - aimTo.x;
   const dy = aimFrom.y - aimTo.y;
@@ -68,6 +68,12 @@ window.addEventListener("pointerup", () => {
   attempts++;
   state = "flying";
   loseReason = null;
+});
+window.addEventListener("pointercancel", () => {
+  if (!aiming) return;
+  aiming = false;
+  aimTo = null;
+  render();
 });
 
 document.getElementById("retry").addEventListener("click", () => reset(false));
